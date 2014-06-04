@@ -36,6 +36,7 @@ See the file *main.cpp* for a full working example with bound. Unused bounds can
 ###License
 ```
 Copyright (c) 2014 Patrick Wieschollek <patrick@wieschollek.info>
+url: https://github.com/PatWie/LBFGSB
 All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
