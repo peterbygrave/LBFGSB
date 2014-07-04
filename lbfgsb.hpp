@@ -1,7 +1,7 @@
 /**
  *           c++11-only implementation of the L-BFGS-B algorithm
  *
- * Copyright (c) 2014 Patrick Wieschollek <patrick@wieschollek.info>
+ * Copyright (c) 2014 Patrick Wieschollek
  *               https://github.com/PatWie/LBFGSB
  * All rights reserved.
  *
