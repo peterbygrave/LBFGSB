@@ -35,39 +35,38 @@
  *
  */
 
-Matrix A(2,2);
+Matrix A(2, 2);
 Vector b(2);
-Vector l(2),r(2);
+Vector l(2), r(2);
 
-void initConstants(){
-	A << 3 ,3.1, 3.1, 10;
-	b << 1,3;
-	l << -INF ,0;
+void initConstants() {
+	A << 3, 3.1, 3.1, 10;
+	b << 1, 3;
+	l << -INF, 0;
 	r << INF, INF;
 }
 
-double Quadratic_ValueSimple(const Vector& x){
+double Quadratic_ValueSimple(const Vector& x) {
 	// return the value of the function
-	return x.transpose()*A*x+b.dot(x);
+	return x.transpose() * A * x + b.dot(x);
 }
 
-void Quadratic_GradientSimple(const Vector& X, Vector& Y){
+void Quadratic_GradientSimple(const Vector& X, Vector& Y) {
 	// return the gradient of the function (vector)
-	Y=Vector::Zero(2,1);
-	Y = 2*A*X +b;
+	Y = Vector::Zero(2, 1);
+	Y = 2 * A * X + b;
 }
 
-
-int main(){
+int main() {
 	// init predefined constants
 	initConstants();
-    // init solver with bounds
-	LBFGSB MySolver(l,r);
+	// init solver with bounds
+	LBFGSB MySolver(l, r);
 	// create starting point
-	Vector XOpt = Vector::Zero(2,1);
+	Vector XOpt = Vector::Zero(2, 1);
 	XOpt << 0.3, 0.3;
 	// solve the problem
-	MySolver.Solve(XOpt,Quadratic_ValueSimple,Quadratic_GradientSimple);
+	MySolver.Solve(XOpt, Quadratic_ValueSimple, Quadratic_GradientSimple);
 	// print the solution
 	std::cout << MySolver.XOpt.transpose();
 	std::cout << std::endl;
