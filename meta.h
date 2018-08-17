@@ -29,8 +29,8 @@
 #include <stdexcept>
 #include <cmath>
 
-#include <Eigen/Dense>
-#include <Eigen/Core>
+#include <armadillo>
+#include <algorithm>
 #include <iostream>
 #include <vector>
 
@@ -51,18 +51,8 @@ struct Options{
 
 const double EPS=2.2204e-016;
 
-typedef Eigen::MatrixXd Matrix;
-typedef Eigen::VectorXd Vector;
-typedef Eigen::VectorXd::Scalar Scalar;
-
-typedef Eigen::Map<Matrix> ViewMatrix;
-typedef Eigen::Map<Vector> ViewVector;
-
-typedef const Eigen::Map<const Matrix> ReadMatrix;
-typedef const Eigen::Map<const Vector> ReadVector;
-
-typedef std::function<double(const Eigen::VectorXd &x)> FunctionOracleType;
-typedef std::function<void(const Eigen::VectorXd &x, Eigen::VectorXd &gradient)> GradientOracleType;
+typedef std::function<double(const arma::vec &x)> FunctionOracleType;
+typedef std::function<void(const arma::vec &x, arma::vec &gradient)> GradientOracleType;
 
 #define INF HUGE_VAL
 #define Assert(x,m) if (!(x)) { throw (std::runtime_error(m)); }
@@ -81,9 +71,12 @@ typedef std::function<void(const Eigen::VectorXd &x, Eigen::VectorXd &gradient)>
 
 std::vector<int> sort_indexes(const std::vector< std::pair<int,double> > &v) {
   std::vector<int> idx(v.size());
-  for (size_t i = 0; i != idx.size(); ++i)
-	  idx[i] = v[i].first;
-  sort(idx.begin(), idx.end(),[&v](size_t i1, size_t i2) {return v[i1].second < v[i2].second;});
+  for (size_t i = 0; i != idx.size(); ++i) {
+		idx[i] = v[i].first;
+  }
+  using std::sort;
+  sort(idx.begin(), idx.end(),
+  		[&v](size_t i1, size_t i2) {return v[i1].second < v[i2].second;});
   return idx;
 }
 
