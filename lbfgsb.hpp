@@ -34,8 +34,7 @@
 #include <iostream>
 #include <functional>
 #include <vector>
-#include <Eigen/Core>
-#include <Eigen/Dense>
+#include <armadillo>
 
 /* coded from scratch !!!
  * based on the paper
@@ -52,35 +51,35 @@ class LBFGSB {
 	FunctionOracleType FunctionObjectiveOracle_;
 	GradientOracleType FunctionGradientOracle_;
 
-	Matrix W, M;
-	Vector lb, ub;
+	arma::mat W, M;
+	arma::vec lb, ub;
 	double theta;
 	int DIM;
 
-	std::list<Vector> xHistory;
+	std::list<arma::vec> xHistory;
 
 public:
 
-	Vector XOpt;
+	arma::vec XOpt;
 
-	LBFGSB(const Vector &l, const Vector &u) :
-			lb(l), ub(u), theta(1.0), DIM(l.rows()) {
+	LBFGSB(const arma::vec &l, const arma::vec &u) :
+			lb(l), ub(u), theta(1.0), DIM(l.n_rows) {
 		lb = l;
 		ub = u;
 		theta = 1.0;
-		DIM = l.rows();
-		W = Matrix::Zero(DIM, 0);
-		M = Matrix::Zero(0, 0);
+		DIM = l.n_rows;
+		W = arma::zeros(DIM, 0);
+		M = arma::zeros(0, 0);
 	}
 
-	LBFGSB(Options &Options, const Vector &l, const Vector &u) {
+	LBFGSB(Options &Options, const arma::vec &l, const arma::vec &u) {
 		Options_ = Options;
 		lb = l;
 		ub = u;
 		theta = 1.0;
-		DIM = l.rows();
-		W = Matrix::Zero(DIM, 0);
-		M = Matrix::Zero(0, 0);
+		DIM = l.n_rows;
+		W = arma::zeros(DIM, 0);
+		M = arma::zeros(0, 0);
 
 	}
 
@@ -88,9 +87,9 @@ public:
 	/// find cauchy point in x
 	/// </summary>
 	/// <parameter name="x">start in x</parameter>
-	void GetGeneralizedCauchyPoint(Vector &x, Vector &g, Vector &x_cauchy,
-			Vector &c) {
-		const int DIM = x.rows();
+	void GetGeneralizedCauchyPoint(arma::vec &x, arma::vec &g, arma::vec &x_cauchy,
+																 arma::vec &c) {
+		const int DIM = x.n_rows;
 		// PAGE 8
 		// Algorithm CP: Computation of the generalized Cauchy point
 		// Given x,l,u,g, and B = \theta I-WMW
@@ -99,7 +98,7 @@ public:
 		// TODO: use "std::set" ?
 		std::vector<std::pair<int, double> > SetOfT;
 		// the feasible set is implicitly given by "SetOfT - {t_i==0}"
-		Vector d = Vector::Zero(DIM, 1);
+		arma::vec d = arma::zeros(DIM);
 
 		// n operations
 		for (int j = 0; j < DIM; j++) {
@@ -125,13 +124,13 @@ public:
 		x_cauchy = x;
 		// Initialize
 		// p := 	W^T*p
-		Vector p = (W.transpose() * d);						// (2mn operations)
+		arma::vec p = (W.t() * d);						// (2mn operations)
 		// c := 	0
-		c = Eigen::MatrixXd::Zero(M.rows(), 1);
+		c = arma::zeros(M.n_rows);
 		// f' := 	g^T*d = -d^Td
-		double f_prime = -d.dot(d);							// (n operations)
+		double f_prime = arma::dot(-d,d);							// (n operations)
 		// f'' :=	\theta*d^T*d-d^T*W*M*W^T*d = -\theta*f' - p^T*M*p
-		double f_doubleprime = (double) (-1.0 * theta) * f_prime - p.dot(M * p);// (O(m^2) operations)
+		double f_doubleprime = (double) (-1.0 * theta) * f_prime - arma::dot(p,M * p);// (O(m^2) operations)
 		// \delta t_min :=	-f'/f''
 		double dt_min = -f_prime / f_doubleprime;
 		// t_old := 	0
@@ -162,15 +161,15 @@ public:
 			// c   :=  c +\delta t*p
 			c += dt * p;
 			// cache
-			Vector wbt = W.row(b);
+			arma::rowvec wbt = W.row(b);
 
-			f_prime += dt * f_doubleprime + (double) g(b) * g(b)
-					+ (double) theta * g(b) * zb
-					- (double) g(b) * wbt.transpose() * (M * c);
-			f_doubleprime += (double) -1.0 * theta * g(b) * g(b)
-					- (double) 2.0 * (g(b) * (wbt.dot(M * p)))
-					- (double) g(b) * g(b) * wbt.transpose() * (M * wbt);
-			p += g(b) * wbt.transpose();
+			f_prime += dt * f_doubleprime + g(b) * g(b)
+					+ theta * g(b) * zb
+					- g(b) * arma::dot(wbt.t(), (M * c));
+			f_doubleprime += -1.0 * theta * g(b) * g(b)
+					-  2.0 * (g(b) * arma::dot(wbt.t(),(M * p)))
+					-  g(b) * g(b) * arma::dot(wbt.t(),M * wbt);
+			p += g(b) * wbt.t();
 			d(b) = 0;
 			dt_min = -f_prime / f_doubleprime;
 			t_old = t;
@@ -189,7 +188,7 @@ public:
 		Debug(SortedIndices[0]<< " "<< SortedIndices[1]);
 
 #pragma omp parallel for
-		for (int ii = i; ii < x_cauchy.rows(); ii++) {
+		for (int ii = i; ii < x_cauchy.n_rows; ii++) {
 			x_cauchy(SortedIndices[ii]) = x(SortedIndices[ii])
 					+ t_old * d(SortedIndices[ii]);
 		}Debug(x_cauchy.transpose());
@@ -205,7 +204,7 @@ public:
 	/// <parameter name="x_cp">cauchy point</parameter>
 	/// <parameter name="du">unconstrained solution of subspace minimization</parameter>
 	/// <parameter name="FreeVariables">flag (1 if is free variable and 0 if is not free variable)</parameter>
-	double FindAlpha(Vector &x_cp, Vector &du,
+	double FindAlpha(arma::vec &x_cp, arma::vec &du,
 			std::vector<int> &FreeVariables) {
 		/* this returns
 		 * a* = max {a : a <= 1 and  l_i-xc_i <= a*d_i <= u_i-xc_i}
@@ -234,14 +233,14 @@ public:
 	/// <parameter name="f">current value of objective (will be changed)</parameter>
 	/// <parameter name="g">current gradient of objective (will be changed)</parameter>
 	/// <parameter name="t">step width (will be changed)</parameter>
-	void LineSearch(Vector &x, Vector dx, double &f, Vector &g, double &t) {
+	void LineSearch(arma::vec &x, arma::vec dx, double &f, arma::vec &g, double &t) {
 
 		const double alpha = 0.2;
 		const double beta = 0.8;
 
 		const double f_in = f;
-		const Vector g_in = g;
-		const double Cache = alpha * g_in.dot(dx);
+		const arma::vec g_in = g;
+		const double Cache = alpha * arma::dot(g_in,dx);
 
 		t = 1.0;
 		f = FunctionObjectiveOracle_(x + t * dx);
@@ -258,8 +257,8 @@ public:
 	/// direct primal approach
 	/// </summary>
 	/// <parameter name="x">start in x</parameter>
-	void SubspaceMinimization(Vector &x_cauchy, Vector &x, Vector &c, Vector &g,
-			Vector &SubspaceMin) {
+	void SubspaceMinimization(arma::vec &x_cauchy, arma::vec &x, arma::vec &c, arma::vec &g,
+														arma::vec &SubspaceMin) {
 
 		// cached value: ThetaInverse=1/theta;
 		double theta_inverse = 1 / theta;
@@ -269,7 +268,7 @@ public:
 		Debug(x_cauchy.transpose());
 
 		//std::cout << "free vars " << FreeVariables.rows() << std::endl;
-		for (int i = 0; i < x_cauchy.rows(); i++) {
+		for (int i = 0; i < x_cauchy.n_rows; i++) {
 			Debug(x_cauchy(i) << " "<< ub(i) << " "<< lb(i));
 			if ((x_cauchy(i) != ub(i)) && (x_cauchy(i) != lb(i))) {
 				FreeVariablesIndex.push_back(i);
@@ -277,7 +276,7 @@ public:
 		}
 		const int FreeVarCount = FreeVariablesIndex.size();
 
-		Matrix WZ = Matrix::Zero(W.cols(), FreeVarCount);
+		arma::mat WZ = arma::zeros(W.n_cols, FreeVarCount);
 
 		for (int i = 0; i < FreeVarCount; i++)
 			WZ.col(i) = W.row(FreeVariablesIndex[i]);
@@ -286,33 +285,33 @@ public:
 
 		// r=(g+theta*(x_cauchy-x)-W*(M*c));
 		Debug(g);Debug(x_cauchy);Debug(x);
-		Vector rr = (g + theta * (x_cauchy - x) - W * (M * c));
+		arma::vec rr = (g + theta * (x_cauchy - x) - W * (M * c));
 		// r=r(FreeVariables);
-		Vector r = Matrix::Zero(FreeVarCount, 1);
+		arma::vec r = arma::zeros(FreeVarCount, 1);
 		for (int i = 0; i < FreeVarCount; i++)
 			r.row(i) = rr.row(FreeVariablesIndex[i]);
 
 		Debug(r.transpose());
 
 		// STEP 2: "v = w^T*Z*r" and STEP 3: "v = M*v"
-		Vector v = M * (WZ * r);
+		arma::vec v = M * (WZ * r);
 		// STEP 4: N = 1/theta*W^T*Z*(W^T*Z)^T
-		Matrix N = theta_inverse * WZ * WZ.transpose();
+		arma::mat N = theta_inverse * WZ * WZ.t();
 		// N = I - MN
-		N = Matrix::Identity(N.rows(), N.rows()) - M * N;
+		N = arma::eye(N.n_rows, N.n_rows) - M * N;
 		// STEP: 5
 		// v = N^{-1}*v
-		v = N.lu().solve(v);
+		v = arma::inv(N) * v;
 		// STEP: 6
 		// HERE IS A MISTAKE IN THE ORIGINAL PAPER!
-		Vector du = -theta_inverse * r
-				- theta_inverse * theta_inverse * WZ.transpose() * v;
+		arma::vec du = -theta_inverse * r
+				- theta_inverse * theta_inverse * WZ.t() * v;
 		Debug(du.transpose());
 		// STEP: 7
 		double alpha_star = FindAlpha(x_cauchy, du, FreeVariablesIndex);
 
 		// STEP: 8
-		Vector dStar = alpha_star * du;
+		arma::vec dStar = alpha_star * du;
 
 		SubspaceMin = x_cauchy;
 		for (int i = 0; i < FreeVarCount; i++) {
@@ -321,29 +320,29 @@ public:
 		}
 	}
 
-	void Solve(Vector &x0, const FunctionOracleType& FunctionValue,
+	void Solve(arma::vec &x0, const FunctionOracleType& FunctionValue,
 			const GradientOracleType& FunctionGradient) {
 		FunctionObjectiveOracle_ = FunctionValue;
 		FunctionGradientOracle_ = FunctionGradient;
 
-		Assert(x0.rows() == lb.rows(), "lower bound size incorrect");
-		Assert(x0.rows() == ub.rows(), "upper bound size incorrect");
+		Assert(x0.n_rows == lb.n_rows, "lower bound size incorrect");
+		Assert(x0.n_rows == ub.n_rows, "upper bound size incorrect");
 
 		Debug(x0.transpose());Debug(lb.transpose());Debug(ub.transpose());
 
-		Assert((x0.array() >= lb.array()).all(),
+		Assert(arma::all(x0 >= lb),
 				"seed is not feasible (violates lower bound)");
-		Assert((x0.array() <= ub.array()).all(),
+		Assert(arma::all(x0 <= ub),
 				"seed is not feasible (violates upper bound)");
 
-		const int DIM = x0.rows();
+		const int DIM = x0.n_rows;
 
 		xHistory.push_back(x0);
 
-		Matrix yHistory = Matrix::Zero(DIM, 0);
-		Matrix sHistory = Matrix::Zero(DIM, 0);
+		arma::mat yHistory = arma::zeros(DIM, 0);
+		arma::mat sHistory = arma::zeros(DIM, 0);
 
-		Vector x = x0, g;
+		arma::vec x = x0, g;
 		int k = 0;
 
 		double f = FunctionObjectiveOracle_(x);
@@ -352,22 +351,23 @@ public:
 
 		theta = 1.0;
 
-		W = Matrix::Zero(DIM, 0);
-		M = Matrix::Zero(0, 0);
+		W = arma::zeros(DIM, 0);
+		M = arma::zeros(0, 0);
 
 		auto noConvergence =
-				[&](Vector& x, Vector& g)->bool {
+				[&](arma::vec & x, arma::vec & g)->bool {
 					return (((x - g).cwiseMax(lb).cwiseMin(ub) - x).lpNorm<Eigen::Infinity>()>= Options_.tol);
 				};
 
 		while (noConvergence(x, g) && (k < Options_.maxIter)) {
 			Debug("iteration "<<k)
 			double f_old = f;
-			Vector x_old = x;
-			Vector g_old = g;
+			arma::vec x_old = x;
+			arma::vec g_old = g;
 
 			// STEP 2: compute the cauchy point by algorithm CP
-			Vector CauchyPoint = Matrix::Zero(DIM, 1), c = Matrix::Zero(DIM, 1);
+			arma::vec CauchyPoint = arma::zeros(DIM);
+			arma::vec c = arma::zeros(DIM);
 			GetGeneralizedCauchyPoint(x, g, CauchyPoint, c);
 			// STEP 3: compute a search direction d_k by the primal method
 			Vector SubspaceMin;
