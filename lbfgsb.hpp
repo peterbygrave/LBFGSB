@@ -321,59 +321,62 @@ public:
 		}
 	}
 
-	void Solve(Vector &x0, const FunctionOracleType& FunctionValue,
+	void Solve(arma::vec &x0, const FunctionOracleType& FunctionValue,
 			const GradientOracleType& FunctionGradient) {
 		FunctionObjectiveOracle_ = FunctionValue;
 		FunctionGradientOracle_ = FunctionGradient;
 
-		Assert(x0.rows() == lb.rows(), "lower bound size incorrect");
-		Assert(x0.rows() == ub.rows(), "upper bound size incorrect");
+		Assert(x0.n_rows == lb.n_rows, "lower bound size incorrect");
+		Assert(x0.n_rows == ub.n_rows, "upper bound size incorrect");
 
-		Debug(x0.transpose());Debug(lb.transpose());Debug(ub.transpose());
 
-		Assert((x0.array() >= lb.array()).all(),
+		Assert(arma::all(x0 >= lb),
 				"seed is not feasible (violates lower bound)");
-		Assert((x0.array() <= ub.array()).all(),
+		Assert(arma::all(x0 <= ub),
 				"seed is not feasible (violates upper bound)");
 
-		const int DIM = x0.rows();
+		const int DIM = x0.n_rows;
 
 		xHistory.push_back(x0);
 
-		Matrix yHistory = Matrix::Zero(DIM, 0);
-		Matrix sHistory = Matrix::Zero(DIM, 0);
+		arma::mat yHistory = arma::zeros(DIM, 0);
+		arma::mat sHistory = arma::zeros(DIM, 0);
 
-		Vector x = x0, g;
+		arma::vec x = x0, g;
 		int k = 0;
 
 		double f = FunctionObjectiveOracle_(x);
 		FunctionGradientOracle_(x, g);
-		Debug(f);Debug(g.transpose());
 
 		theta = 1.0;
 
-		W = Matrix::Zero(DIM, 0);
-		M = Matrix::Zero(0, 0);
+		W = arma::zeros(DIM, 0);
+		M = arma::zeros(0, 0);
 
 		auto noConvergence =
-				[&](Vector& x, Vector& g)->bool {
-					return (((x - g).cwiseMax(lb).cwiseMin(ub) - x).lpNorm<Eigen::Infinity>()>= Options_.tol);
+				[&](arma::vec& x, arma::vec& g)->bool {
+			    arma::vec clamped = x - g;
+			    const auto too_big = arma::find(clamped > lb);
+			    clamped(too_big) = lb(too_big);
+					const auto too_small = arma::find(clamped < ub);
+					clamped(too_small) = ub(too_small);
+					return (arma::norm(clamped - x, "inf")>= Options_.tol);
 				};
 
 		while (noConvergence(x, g) && (k < Options_.maxIter)) {
 			Debug("iteration "<<k)
 			double f_old = f;
-			Vector x_old = x;
-			Vector g_old = g;
+			arma::vec x_old = x;
+			arma::vec g_old = g;
 
 			// STEP 2: compute the cauchy point by algorithm CP
-			Vector CauchyPoint = Matrix::Zero(DIM, 1), c = Matrix::Zero(DIM, 1);
+			arma::vec CauchyPoint = arma::zeros(DIM), c = arma::zeros(DIM);
 			GetGeneralizedCauchyPoint(x, g, CauchyPoint, c);
 			// STEP 3: compute a search direction d_k by the primal method
-			Vector SubspaceMin;
+			arma::vec SubspaceMin;
 			SubspaceMinimization(CauchyPoint, x, c, g, SubspaceMin);
 
-			Matrix H;
+			arma::mat H;
 			double Length = 0;
 
 			// STEP 4: perform linesearch and STEP 5: compute gradient
@@ -382,11 +385,11 @@ public:
 			xHistory.push_back(x);
 
 			// prepare for next iteration
-			Vector newY = g - g_old;
-			Vector newS = x - x_old;
+			arma::vec newY = g - g_old;
+			arma::vec newS = x - x_old;
 
 			// STEP 6:
-			double test = newS.dot(newY);
+			double test = arma::dot(newS, newY);
 			test = (test < 0) ? -1.0 * test : test;
 
 			if (test > EPS * newY.squaredNorm()) {
@@ -404,28 +407,32 @@ public:
 				sHistory.rightCols(1) = newS;
 
 				// STEP 7:
-				theta = (double) (newY.transpose() * newY)
-						/ (newY.transpose() * newS);
+				theta = arma::dot(newY, newY)
+						/ arma::dot(newY, newS);
 
-				W = Matrix::Zero(yHistory.rows(),
-						yHistory.cols() + sHistory.cols());
+				W = arma::zeros(yHistory.n_rows,
+						yHistory.n_cols + sHistory.n_cols);
 
 				W << yHistory, (theta * sHistory);
 
-				Matrix A = sHistory.transpose() * yHistory;
-				Matrix L = A.triangularView<Eigen::StrictlyLower>();
-				Matrix MM(A.rows() + L.rows(), A.rows() + L.cols());
-				Matrix D = -1 * A.diagonal().asDiagonal();
-				MM << D, L.transpose(), L, ((sHistory.transpose() * sHistory)
-						* theta);
+				arma::mat A = sHistory.t() * yHistory;
+				arma::mat L = arma::trimatl(A);
+				arma::mat MM(A.n_rows + L.n_rows, A.n_rows + L.n_cols);
+				arma::mat D = -arma::diagmat(A);
+				MM(0, 0, arma::size(D)) = D;
+				MM(0, D.n_cols, arma::size(L.t())) = L.t();
+				MM(D.n_rows, 0, arma::size(L)) = L;
+				arma::mat bottom_right = (sHistory.t() * sHistory)
+											 * theta;
+				MM(D.n_rows, D.n_cols, arma::size(bottom_right)) = bottom_right;
 
-				M = MM.inverse();
+				M = arma::inv(MM);
 			}
 
-			Vector ttt = Matrix::Zero(1, 1);
+			arma::vec ttt = arma::zeros(1);
 			ttt(0) = f_old - f;
-			Debug( "--> "<< ttt.norm());
-			if (ttt.norm() < Options_.tol) {
+			Debug( "--> "<< arma::norm(ttt));
+			if (arma::norm(ttt) < Options_.tol) {
 				// successive function values too similar
 				break;
 			}
