@@ -392,19 +392,19 @@ public:
 			double test = arma::dot(newS, newY);
 			test = (test < 0) ? -1.0 * test : test;
 
-			if (test > EPS * newY.squaredNorm()) {
+			if (test > EPS * arma::norm(newY, 2)) {
 				if (k < Options_.m) {
-					yHistory.conservativeResize(DIM, k + 1);
-					sHistory.conservativeResize(DIM, k + 1);
+					yHistory.resize(DIM, k + 1);
+					sHistory.resize(DIM, k + 1);
 				} else {
 
-					yHistory.leftCols(Options_.m - 1) = yHistory.rightCols(
-							Options_.m - 1).eval();
-					sHistory.leftCols(Options_.m - 1) = sHistory.rightCols(
-							Options_.m - 1).eval();
+					yHistory.head_cols(Options_.m - 1) = yHistory.tail_cols(
+							Options_.m - 1);
+					sHistory.head_cols(Options_.m - 1) = sHistory.tail_cols(
+							Options_.m - 1);
 				}
-				yHistory.rightCols(1) = newY;
-				sHistory.rightCols(1) = newS;
+				yHistory.tail_cols(1) = newY;
+				sHistory.tail_cols(1) = newS;
 
 				// STEP 7:
 				theta = arma::dot(newY, newY)
@@ -413,7 +413,9 @@ public:
 				W = arma::zeros(yHistory.n_rows,
 						yHistory.n_cols + sHistory.n_cols);
 
-				W << yHistory, (theta * sHistory);
+				W(0, 0, arma::size(yHistory)) = yHistory;
+
+        W(0, yHistory.n_cols, arma::size(sHistory)) = theta * sHistory;
 
 				arma::mat A = sHistory.t() * yHistory;
 				arma::mat L = arma::trimatl(A);

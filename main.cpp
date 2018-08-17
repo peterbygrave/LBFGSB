@@ -35,25 +35,25 @@
  *
  */
 
-Matrix A(2, 2);
-Vector b(2);
-Vector l(2), r(2);
+arma::mat A(2, 2);
+arma::vec b(2);
+arma::vec l(2), r(2);
 
 void initConstants() {
-	A << 3, 3.1, 3.1, 10;
-	b << 1, 3;
-	l << -INF, 0;
-	r << INF, INF;
+	A = {{3, 3.1}, {3.1, 10}};
+	b = {1, 3};
+	l = {-arma::datum::inf, 0};
+	r = {arma::datum::inf, arma::datum::inf};
 }
 
-double Quadratic_ValueSimple(const Vector& x) {
+double Quadratic_ValueSimple(const arma::vec& x) {
 	// return the value of the function
-	return x.transpose() * A * x + b.dot(x);
+	return arma::dot(x.t(),  A * x) + arma::dot(b, x);
 }
 
-void Quadratic_GradientSimple(const Vector& X, Vector& Y) {
+void Quadratic_GradientSimple(const arma::vec& X, arma::vec& Y) {
 	// return the gradient of the function (vector)
-	Y = Vector::Zero(2, 1);
+	Y = arma::zeros(2, 1);
 	Y = 2 * A * X + b;
 }
 
@@ -63,12 +63,11 @@ int main() {
 	// init solver with bounds
 	LBFGSB MySolver(l, r);
 	// create starting point
-	Vector XOpt = Vector::Zero(2, 1);
-	XOpt << 0.3, 0.3;
+	arma::vec XOpt = {0.3, 0.3};
 	// solve the problem
 	MySolver.Solve(XOpt, Quadratic_ValueSimple, Quadratic_GradientSimple);
 	// print the solution
-	std::cout << MySolver.XOpt.transpose();
+	std::cout << MySolver.XOpt.t();
 	std::cout << std::endl;
 
 	return 0;
