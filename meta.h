@@ -54,7 +54,7 @@ const double EPS=2.2204e-016;
 typedef std::function<double(const arma::vec &x)> FunctionOracleType;
 typedef std::function<void(const arma::vec &x, arma::vec &gradient)> GradientOracleType;
 
-#define INF HUGE_VAL
+#define INF arma::datum::inf
 #define Assert(x,m) if (!(x)) { throw (std::runtime_error(m)); }
 
 #define FAST

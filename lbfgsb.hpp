@@ -166,9 +166,10 @@ public:
 			f_prime += dt * f_doubleprime + g(b) * g(b)
 					+ theta * g(b) * zb
 					- g(b) * arma::dot(wbt.t(), (M * c));
-			f_doubleprime += -1.0 * theta * g(b) * g(b)
-					-  2.0 * (g(b) * arma::dot(wbt.t(),(M * p)))
-					-  g(b) * g(b) * arma::dot(wbt.t(),M * wbt);
+			f_doubleprime += -1.0 * theta * g(b) * g(b);
+			f_doubleprime += -2.0 * g(b) * arma::dot(wbt.t(), M * p);
+			// TODO Check M * wbt.t() is correct
+			f_doubleprime += -g(b) * g(b) * arma::dot(wbt.t(), M * wbt.t());
 			p += g(b) * wbt.t();
 			d(b) = 0;
 			dt_min = -f_prime / f_doubleprime;
@@ -279,7 +280,7 @@ public:
 		arma::mat WZ = arma::zeros(W.n_cols, FreeVarCount);
 
 		for (int i = 0; i < FreeVarCount; i++)
-			WZ.col(i) = W.row(FreeVariablesIndex[i]);
+			WZ.col(i) = W.row(FreeVariablesIndex[i]).t();
 
 		Debug(WZ);
 
@@ -287,7 +288,7 @@ public:
 		Debug(g);Debug(x_cauchy);Debug(x);
 		arma::vec rr = (g + theta * (x_cauchy - x) - W * (M * c));
 		// r=r(FreeVariables);
-		arma::vec r = arma::zeros(FreeVarCount, 1);
+		arma::vec r = arma::zeros(FreeVarCount);
 		for (int i = 0; i < FreeVarCount; i++)
 			r.row(i) = rr.row(FreeVariablesIndex[i]);
 
