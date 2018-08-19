@@ -169,7 +169,7 @@ public:
                  + theta * g(b) * zb
                  - g(b) * arma::dot(wbt.t(), (M * c));
       f_doubleprime += -1.0 * theta * g(b) * g(b);
-      f_doubleprime += -2.0 * g(b) * arma::dot(wbt.t(), M * p);
+      f_doubleprime += 2.0 * g(b) * arma::dot(wbt.t(), M * p);
       // TODO Check M * wbt.t() is correct
       f_doubleprime += -g(b) * g(b) * arma::dot(wbt.t(), M * wbt.t());
       p += g(b) * wbt.t();
@@ -190,7 +190,6 @@ public:
 
     Debug(SortedIndices[0] << " " << SortedIndices[1]);
 
-#pragma omp parallel for
     for (int ii = i; ii < x_cauchy.n_rows; ii++) {
       x_cauchy(SortedIndices[ii]) = x(SortedIndices[ii])
                                     + t_old * d(SortedIndices[ii]);
